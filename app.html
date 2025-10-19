@@ -26,8 +26,14 @@
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .form-group { margin-bottom: 12px; }
-    .form-label { display: block; font-weight: bold; margin-bottom: 6px; }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
     .form-input, textarea, select {
       width: 100%;
       padding: 8px;
@@ -42,9 +48,10 @@
       border-radius: 8px;
       cursor: pointer;
       font-weight: bold;
-      margin-right: 6px;
     }
-    .btn:hover { background: #005fc4; }
+    .btn:hover {
+      background: #005fc4;
+    }
     .card {
       border: 1px solid #ccc;
       border-radius: 8px;
@@ -83,8 +90,8 @@
     <button id="logout-btn" class="btn" style="display:none;">Выйти</button>
   </header>
 
-  <!-- Авторизация -->
-  <div class="container" id="auth-container">
+  <!-- Блок авторизации -->
+  <div class="container" id="auth-container" style="display:none;">
     <h2>Вход / Регистрация</h2>
     <div class="form-group">
       <label class="form-label">Имя пользователя</label>
@@ -94,21 +101,15 @@
       <label class="form-label">Пароль</label>
       <input type="password" id="login-password" class="form-input" placeholder="Введите пароль">
     </div>
-    <div class="form-group">
-      <label class="form-label">Роль</label>
-      <select id="login-role" class="form-input">
-        <option value="driver">Водитель</option>
-        <option value="guest">Гость</option>
-      </select>
-    </div>
     <button class="btn" onclick="login()">Войти</button>
-    <button class="btn" style="background:#28a745;" onclick="register()">Регистрация</button>
+    <button class="btn" style="background:#28a745;" onclick="registerDriver()">Регистрация водителя</button>
     <p style="margin-top:8px; color:#888;">Админ: admin / 1234</p>
   </div>
 
   <!-- Основное приложение -->
   <div class="container" id="app-container" style="display:none;">
-    <div class="nav" id="nav-tabs"></div>
+    <div class="nav" id="nav-buttons"></div>
+
     <div id="tab-add-content" style="display:none;">
       <h3>Добавить нового гостя</h3>
       <div class="form-group">
@@ -149,26 +150,30 @@
     const ADMIN = { username: 'admin', password: '1234', role: 'admin' };
     let currentUser = null;
 
-    // --- Хранилища ---
-    const saveUsers = users => localStorage.setItem('users', JSON.stringify(users));
-    const loadUsers = () => JSON.parse(localStorage.getItem('users') || '[]');
-    const loadRequests = () => JSON.parse(localStorage.getItem('requests') || '[]');
-    const saveRequests = reqs => localStorage.setItem('requests', JSON.stringify(reqs));
+    function saveUsers(users) {
+      localStorage.setItem('users', JSON.stringify(users));
+    }
+    function loadUsers() {
+      return JSON.parse(localStorage.getItem('users') || '[]');
+    }
+    function loadRequests() {
+      return JSON.parse(localStorage.getItem('requests') || '[]');
+    }
+    function saveRequests(reqs) {
+      localStorage.setItem('requests', JSON.stringify(reqs));
+    }
 
-    // --- Регистрация ---
-    function register() {
+    function registerDriver() {
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
-      const role = document.getElementById('login-role').value;
       if (!username || !password) return alert('Введите логин и пароль');
       const users = loadUsers();
       if (users.find(u => u.username === username)) return alert('Такой пользователь уже есть');
-      users.push({ username, password, role });
+      users.push({ username, password, role: 'driver' });
       saveUsers(users);
       alert('Регистрация успешна! Теперь войдите.');
     }
 
-    // --- Вход ---
     function login() {
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
@@ -184,7 +189,6 @@
       showApp();
     }
 
-    // --- Выход ---
     function logout() {
       localStorage.removeItem('currentUser');
       currentUser = null;
@@ -193,81 +197,68 @@
       document.getElementById('logout-btn').style.display = 'none';
     }
 
-    // --- Отображение вкладок по ролям ---
     function showApp() {
       document.getElementById('auth-container').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
       document.getElementById('logout-btn').style.display = 'block';
-
-      const nav = document.getElementById('nav-tabs');
-      nav.innerHTML = '';
-      const addTab = roleButton('add', 'Добавить гостя');
-      const queueTab = roleButton('queue', 'Очередь');
-      const orderTab = roleButton('orders', 'Мои заказы');
-
-      if (currentUser.role === 'admin') nav.append(addTab, queueTab, orderTab);
-      else if (currentUser.role === 'driver') nav.append(queueTab, orderTab);
-      else if (currentUser.role === 'guest') nav.append(orderTab);
-
-      showTab(currentUser.role === 'admin' ? 'queue' : 'orders');
+      buildNav();
+      showTab('orders');
       updateQueue();
       updateOrders();
     }
 
-    function roleButton(id, name) {
-      const btn = document.createElement('button');
-      btn.id = `tab-${id}`;
-      btn.textContent = name;
-      btn.onclick = () => showTab(id);
-      return btn;
+    function buildNav() {
+      const nav = document.getElementById('nav-buttons');
+      nav.innerHTML = '';
+
+      if (currentUser.role === 'admin') {
+        nav.innerHTML += `<button id="tab-add" onclick="showTab('add')">Добавить гостя</button>`;
+        nav.innerHTML += `<button id="tab-queue" onclick="showTab('queue')">Очередь</button>`;
+      }
+
+      nav.innerHTML += `<button id="tab-orders" onclick="showTab('orders')">Мои заказы</button>`;
     }
 
-    // --- Переключение вкладок ---
     function showTab(tab) {
       document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-      const tabBtn = document.getElementById(`tab-${tab}`);
-      if (tabBtn) tabBtn.classList.add('active');
+      const btn = document.getElementById(`tab-${tab}`);
+      if (btn) btn.classList.add('active');
       document.querySelectorAll('#app-container > div[id$="-content"]').forEach(d => d.style.display = 'none');
-      const content = document.getElementById(`tab-${tab}-content`);
-      if (content) content.style.display = 'block';
+      document.getElementById(`tab-${tab}-content`).style.display = 'block';
     }
 
-    // --- Добавление гостя ---
     function addGuest() {
-      if (currentUser.role !== 'admin') return alert('Добавлять гостей может только администратор.');
-
+      if (currentUser.role !== 'admin') {
+        alert('Добавлять гостей может только администратор.');
+        return;
+      }
       const guestName = document.getElementById('guest-name').value.trim();
       const controlPerson = document.getElementById('control-person').value.trim();
       const hotelName = document.getElementById('hotel-name').value.trim();
       const pickupDate = document.getElementById('pickup-date').value;
       const pickupComment = document.getElementById('pickup-comment').value.trim();
-      if (!guestName || !controlPerson || !hotelName || !pickupDate)
-        return alert('Заполните все поля');
-
+      if (!guestName || !controlPerson || !hotelName || !pickupDate) return alert('Заполните все поля');
       const reqs = loadRequests();
-      reqs.push({
+      const request = {
         id: Date.now(),
-        guestName,
-        controlPerson,
-        hotelName,
+        guestName, controlPerson, hotelName,
         pickupDate,
         comment: pickupComment,
         assignedDriver: null
-      });
+      };
+      reqs.push(request);
       saveRequests(reqs);
       document.querySelectorAll('#tab-add-content input, #tab-add-content textarea').forEach(i => i.value = '');
       updateQueue();
       alert('Гость добавлен!');
     }
 
-    // --- Обновление очереди ---
     function updateQueue() {
       const list = document.getElementById('queue-list');
       const reqs = loadRequests();
       list.innerHTML = '';
       const users = loadUsers();
       const isAdmin = currentUser.role === 'admin';
-
       reqs.forEach(r => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -282,8 +273,7 @@
         if (isAdmin) {
           const select = document.createElement('select');
           select.innerHTML = `<option value="">Назначить водителя</option>` +
-            users.filter(u => u.role === 'driver')
-                 .map(u => `<option value="${u.username}">${u.username}</option>`).join('');
+            users.filter(u => u.role === 'driver').map(u => `<option value="${u.username}">${u.username}</option>`).join('');
           select.value = r.assignedDriver || '';
           select.onchange = () => {
             r.assignedDriver = select.value || null;
@@ -297,7 +287,6 @@
       });
     }
 
-    // --- Обновление заказов (водитель / гость) ---
     function updateOrders() {
       const list = document.getElementById('order-list');
       const reqs = loadRequests();
@@ -320,20 +309,35 @@
           <p>Отель: ${r.hotelName}</p>
           <p>📅 ${r.pickupDate}</p>
           ${r.comment ? `<p>💬 ${r.comment}</p>` : ''}
-          ${r.assignedDriver ? `<p>🚗 Водитель: ${r.assignedDriver}</p>` : ''}
+          <p>🚗 Водитель: ${r.assignedDriver ?? 'не назначен'}</p>
         `;
         list.appendChild(card);
       });
       if (myOrders.length === 0) list.innerHTML = '<p>Нет заказов для отображения.</p>';
     }
 
-    // --- Инициализация при загрузке ---
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      currentUser = JSON.parse(savedUser);
-      showApp();
-    }
+    // ✅ Новый механизм для гостей без логина
+    window.onload = () => {
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showApp();
+        return;
+      }
+
+      const isGuest = confirm("Вы гость?");
+      if (isGuest) {
+        const guestName = prompt("Введите ваше имя (ФИО):");
+        if (!guestName) return alert("Имя не указано. Обновите страницу и попробуйте снова.");
+        currentUser = { username: guestName.trim(), role: 'guest' };
+        showApp();
+      } else {
+        document.getElementById('auth-container').style.display = 'block';
+      }
+    };
+
     document.getElementById('logout-btn').onclick = logout;
   </script>
 </body>
 </html>
+
