@@ -90,7 +90,8 @@
     <button id="logout-btn" class="btn" style="display:none;">Выйти</button>
   </header>
 
-  <div class="container" id="auth-container">
+  <!-- Блок авторизации -->
+  <div class="container" id="auth-container" style="display:none;">
     <h2>Вход / Регистрация</h2>
     <div class="form-group">
       <label class="form-label">Имя пользователя</label>
@@ -100,12 +101,20 @@
       <label class="form-label">Пароль</label>
       <input type="password" id="login-password" class="form-input" placeholder="Введите пароль">
     </div>
+    <div class="form-group">
+      <label class="form-label">Номер телефона (для водителей)</label>
+      <input id="login-phone" class="form-input" placeholder="Необязательно">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Номер машины (для водителей)</label>
+      <input id="login-car" class="form-input" placeholder="Необязательно">
+    </div>
     <button class="btn" onclick="login()">Войти</button>
     <button class="btn" style="background:#28a745;" onclick="registerDriver()">Регистрация водителя</button>
-    <button class="btn" style="background:#ff9500;" onclick="registerGuest()">Регистрация гостя</button>
     <p style="margin-top:8px; color:#888;">Админ: admin / 1234</p>
   </div>
 
+  <!-- Основное приложение -->
   <div class="container" id="app-container" style="display:none;">
     <div class="nav" id="nav-buttons"></div>
 
@@ -163,21 +172,16 @@
     }
 
     function registerDriver() {
-      register('driver');
-    }
-    function registerGuest() {
-      register('guest');
-    }
-
-    function register(role) {
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
+      const phone = document.getElementById('login-phone').value.trim();
+      const car = document.getElementById('login-car').value.trim();
       if (!username || !password) return alert('Введите логин и пароль');
       const users = loadUsers();
       if (users.find(u => u.username === username)) return alert('Такой пользователь уже есть');
-      users.push({ username, password, role });
+      users.push({ username, password, role: 'driver', phone, car });
       saveUsers(users);
-      alert(`Регистрация успешна! (${role}) Теперь войдите.`);
+      alert('Регистрация успешна! Теперь войдите.');
     }
 
     function login() {
@@ -307,7 +311,10 @@
         myOrders = reqs;
       }
 
+      const users = loadUsers();
+
       myOrders.forEach(r => {
+        const driver = users.find(u => u.username === r.assignedDriver);
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
@@ -316,23 +323,34 @@
           <p>📅 ${r.pickupDate}</p>
           ${r.comment ? `<p>💬 ${r.comment}</p>` : ''}
           <p>🚗 Водитель: ${r.assignedDriver ?? 'не назначен'}</p>
+          ${driver ? `<p>📞 Телефон: ${driver.phone || 'не указан'}</p><p>🚘 Машина: ${driver.car || 'не указана'}</p>` : ''}
         `;
         list.appendChild(card);
       });
       if (myOrders.length === 0) list.innerHTML = '<p>Нет заказов для отображения.</p>';
     }
 
-    // Инициализация
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      currentUser = JSON.parse(savedUser);
-      showApp();
-    }
+    // ✅ Новый механизм для гостей без логина
+    window.onload = () => {
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showApp();
+        return;
+      }
+
+      const isGuest = confirm("Вы гость?");
+      if (isGuest) {
+        const guestName = prompt("Введите ваше имя (ФИО):");
+        if (!guestName) return alert("Имя не указано. Обновите страницу и попробуйте снова.");
+        currentUser = { username: guestName.trim(), role: 'guest' };
+        showApp();
+      } else {
+        document.getElementById('auth-container').style.display = 'block';
+      }
+    };
+
     document.getElementById('logout-btn').onclick = logout;
   </script>
 </body>
 </html>
-
-
-
-
