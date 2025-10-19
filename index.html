@@ -16,6 +16,7 @@
       padding: 12px;
       text-align: center;
       font-weight: bold;
+      position: relative;
     }
     .container {
       max-width: 800px;
@@ -88,6 +89,7 @@
     🚘 Система встреч гостей
     <button id="logout-btn" class="btn" style="display:none;">Выйти</button>
   </header>
+
   <div class="container" id="auth-container">
     <h2>Вход / Регистрация</h2>
     <div class="form-group">
@@ -99,16 +101,13 @@
       <input type="password" id="login-password" class="form-input" placeholder="Введите пароль">
     </div>
     <button class="btn" onclick="login()">Войти</button>
-    <button class="btn" style="background:#28a745;" onclick="register()">Регистрация водителя</button>
+    <button class="btn" style="background:#28a745;" onclick="registerDriver()">Регистрация водителя</button>
+    <button class="btn" style="background:#ff9500;" onclick="registerGuest()">Регистрация гостя</button>
     <p style="margin-top:8px; color:#888;">Админ: admin / 1234</p>
   </div>
 
   <div class="container" id="app-container" style="display:none;">
-    <div class="nav">
-      <button id="tab-add" onclick="showTab('add')">Добавить гостя</button>
-      <button id="tab-queue" onclick="showTab('queue')">Очередь</button>
-      <button id="tab-orders" onclick="showTab('orders')">Мои заказы</button>
-    </div>
+    <div class="nav" id="nav-buttons"></div>
 
     <div id="tab-add-content" style="display:none;">
       <h3>Добавить нового гостя</h3>
@@ -163,15 +162,22 @@
       localStorage.setItem('requests', JSON.stringify(reqs));
     }
 
-    function register() {
+    function registerDriver() {
+      register('driver');
+    }
+    function registerGuest() {
+      register('guest');
+    }
+
+    function register(role) {
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
       if (!username || !password) return alert('Введите логин и пароль');
       const users = loadUsers();
       if (users.find(u => u.username === username)) return alert('Такой пользователь уже есть');
-      users.push({ username, password, role: 'driver' });
+      users.push({ username, password, role });
       saveUsers(users);
-      alert('Регистрация успешна! Теперь войдите.');
+      alert(`Регистрация успешна! (${role}) Теперь войдите.`);
     }
 
     function login() {
@@ -201,14 +207,28 @@
       document.getElementById('auth-container').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
       document.getElementById('logout-btn').style.display = 'block';
-      showTab('queue');
+      buildNav();
+      showTab('orders');
       updateQueue();
       updateOrders();
     }
 
+    function buildNav() {
+      const nav = document.getElementById('nav-buttons');
+      nav.innerHTML = '';
+
+      if (currentUser.role === 'admin') {
+        nav.innerHTML += `<button id="tab-add" onclick="showTab('add')">Добавить гостя</button>`;
+        nav.innerHTML += `<button id="tab-queue" onclick="showTab('queue')">Очередь</button>`;
+      }
+
+      nav.innerHTML += `<button id="tab-orders" onclick="showTab('orders')">Мои заказы</button>`;
+    }
+
     function showTab(tab) {
       document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-      document.getElementById(`tab-${tab}`).classList.add('active');
+      const btn = document.getElementById(`tab-${tab}`);
+      if (btn) btn.classList.add('active');
       document.querySelectorAll('#app-container > div[id$="-content"]').forEach(d => d.style.display = 'none');
       document.getElementById(`tab-${tab}-content`).style.display = 'block';
     }
@@ -259,7 +279,7 @@
         if (isAdmin) {
           const select = document.createElement('select');
           select.innerHTML = `<option value="">Назначить водителя</option>` +
-            users.map(u => `<option value="${u.username}">${u.username}</option>`).join('');
+            users.filter(u => u.role === 'driver').map(u => `<option value="${u.username}">${u.username}</option>`).join('');
           select.value = r.assignedDriver || '';
           select.onchange = () => {
             r.assignedDriver = select.value || null;
@@ -277,7 +297,16 @@
       const list = document.getElementById('order-list');
       const reqs = loadRequests();
       list.innerHTML = '';
-      const myOrders = reqs.filter(r => r.assignedDriver === currentUser.username);
+      let myOrders = [];
+
+      if (currentUser.role === 'driver') {
+        myOrders = reqs.filter(r => r.assignedDriver === currentUser.username);
+      } else if (currentUser.role === 'guest') {
+        myOrders = reqs.filter(r => r.guestName.toLowerCase() === currentUser.username.toLowerCase());
+      } else if (currentUser.role === 'admin') {
+        myOrders = reqs;
+      }
+
       myOrders.forEach(r => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -286,13 +315,14 @@
           <p>Отель: ${r.hotelName}</p>
           <p>📅 ${r.pickupDate}</p>
           ${r.comment ? `<p>💬 ${r.comment}</p>` : ''}
+          <p>🚗 Водитель: ${r.assignedDriver ?? 'не назначен'}</p>
         `;
         list.appendChild(card);
       });
-      if (myOrders.length === 0) list.innerHTML = '<p>Нет назначенных заказов.</p>';
+      if (myOrders.length === 0) list.innerHTML = '<p>Нет заказов для отображения.</p>';
     }
 
-    // Инициализация при загрузке
+    // Инициализация
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
       currentUser = JSON.parse(savedUser);
@@ -302,6 +332,7 @@
   </script>
 </body>
 </html>
+
 
 
 
