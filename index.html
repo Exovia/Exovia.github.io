@@ -28,28 +28,46 @@ body {font-family:system-ui, sans-serif;background:#f5f5f7;color:#1d1d1f}
 <div class="container">
 <div class="header"><h1>🚗 GuestPickup</h1><p>Управление встречами гостей</p></div>
 
+<!-- Экран выбора роли -->
 <div id="login-screen" class="card">
   <h2>👋 Добро пожаловать!</h2>
   <p>Выберите, кто вы:</p>
   <div style="display:flex;gap:10px;margin-top:15px;">
     <button class="btn" onclick="loginAs('guest')">Гость</button>
-    <button class="btn" onclick="loginAs('driver')">Водитель</button>
-    <button class="btn" onclick="loginAs('admin')">Администратор</button>
+    <button class="btn" onclick="showAuthScreen('driver')">Водитель</button>
+    <button class="btn" onclick="showAuthScreen('admin')">Администратор</button>
   </div>
 </div>
 
+<!-- Вход гостя -->
 <div id="guest-login" class="card" style="display:none;">
   <h2>Введите своё имя</h2>
   <input type="text" id="guestNameInput" class="form-input" placeholder="Например: Иванов Иван">
   <button class="btn" style="margin-top:10px;" onclick="enterGuest()">Продолжить</button>
 </div>
 
+<!-- Авторизация водителя/админа -->
+<div id="auth-screen" class="card" style="display:none;">
+  <h2 id="auth-title">Авторизация</h2>
+  <div class="form-group"><label class="form-label">Имя пользователя</label>
+    <input type="text" id="auth-username" class="form-input" placeholder="Введите логин">
+  </div>
+  <div class="form-group"><label class="form-label">Пароль</label>
+    <input type="password" id="auth-password" class="form-input" placeholder="Введите пароль">
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button class="btn" onclick="loginUser()">Войти</button>
+    <button class="btn" onclick="registerUser()">Регистрация</button>
+  </div>
+</div>
+
+<!-- Основное приложение -->
 <div id="main-app" style="display:none;">
   <div class="tabs" id="tabs">
     <button class="tab active" onclick="showTab('queue')">📋 Очередь</button>
     <button class="tab" onclick="showTab('drivers')">🚗 Водители</button>
     <button class="tab" onclick="showTab('orders')">📦 Заказы</button>
-    <button class="tab" onclick="showTab('add')">➕ Добавить</button>
+    <button class="tab" id="add-tab" onclick="showTab('add')">➕ Добавить</button>
   </div>
 
   <div id="queue" class="content active"><div class="card"><h2>📋 Очередь</h2><div id="queue-list" class="empty">Пока нет заказов</div></div></div>
@@ -68,14 +86,15 @@ body {font-family:system-ui, sans-serif;background:#f5f5f7;color:#1d1d1f}
 </div>
 
 <script>
-let role=null, currentGuestName=null, currentDriverId=null;
-let drivers=[], guests=[], hotels=[], pickupRequests=[];
+let role=null, currentGuestName=null, currentDriverId=null, currentUser=null;
+let drivers=[], guests=[], hotels=[], pickupRequests=[], users=[];
 
 function loadData(){
  drivers=JSON.parse(localStorage.getItem('drivers')||'[]');
  guests=JSON.parse(localStorage.getItem('guests')||'[]');
  hotels=JSON.parse(localStorage.getItem('hotels')||'[]');
  pickupRequests=JSON.parse(localStorage.getItem('pickupRequests')||'[]');
+ users=JSON.parse(localStorage.getItem('users')||'[]');
  currentDriverId=localStorage.getItem('currentDriverId');
 }
 function saveData(){
@@ -83,51 +102,76 @@ function saveData(){
  localStorage.setItem('guests',JSON.stringify(guests));
  localStorage.setItem('hotels',JSON.stringify(hotels));
  localStorage.setItem('pickupRequests',JSON.stringify(pickupRequests));
+ localStorage.setItem('users',JSON.stringify(users));
  if(currentDriverId)localStorage.setItem('currentDriverId',currentDriverId);
 }
 
-function loginAs(r){
+// ---------- АВТОРИЗАЦИЯ ----------
+function showAuthScreen(r){
  role=r;
  document.getElementById('login-screen').style.display='none';
- if(r==='guest'){document.getElementById('guest-login').style.display='block';}
- else{
-   document.getElementById('main-app').style.display='block';
-   updateContent();
-   if(r==='driver') alert('Вы вошли как водитель');
-   if(r==='admin') alert('Вы вошли как администратор');
+ document.getElementById('auth-screen').style.display='block';
+ document.getElementById('auth-title').innerText = r==='driver' ? 'Вход для водителя' : 'Вход для администратора';
+}
+
+function registerUser(){
+ const username=document.getElementById('auth-username').value.trim();
+ const password=document.getElementById('auth-password').value.trim();
+ if(!username||!password){alert('Введите логин и пароль');return;}
+ if(users.find(u=>u.username===username)){alert('Такой пользователь уже существует');return;}
+ const user={id:Date.now()+role,username,password,role};
+ users.push(user);
+ saveData();
+ alert('Регистрация успешна!');
+ if(role==='driver'){
+   drivers.push({id:user.id,name:username,phone:'-',carNumber:'-'});
+   currentDriverId=user.id;
+ }
+ saveData();
+ startApp(user);
+}
+
+function loginUser(){
+ const username=document.getElementById('auth-username').value.trim();
+ const password=document.getElementById('auth-password').value.trim();
+ const user=users.find(u=>u.username===username && u.password===password && u.role===role);
+ if(!user){alert('Неверные данные или нет регистрации');return;}
+ if(role==='driver') currentDriverId=user.id;
+ startApp(user);
+}
+
+function startApp(user){
+ currentUser=user;
+ document.getElementById('auth-screen').style.display='none';
+ document.getElementById('main-app').style.display='block';
+ updateContent();
+ if(user.role==='driver'){
+   document.getElementById('add-tab').style.display='none'; // водители не видят добавление
+   alert('Вы вошли как водитель');
+ }
+ if(user.role==='admin'){
+   document.getElementById('add-tab').style.display='inline-block';
+   alert('Вы вошли как администратор');
  }
 }
 
+// ---------- ГОСТЬ ----------
+function loginAs(r){
+ role=r;
+ document.getElementById('login-screen').style.display='none';
+ if(r==='guest') document.getElementById('guest-login').style.display='block';
+}
 function enterGuest(){
  const name=document.getElementById('guestNameInput').value.trim();
  if(!name){alert('Введите имя');return;}
  currentGuestName=name;
  document.getElementById('guest-login').style.display='none';
  document.getElementById('main-app').style.display='block';
- document.getElementById('tabs').style.display='none'; // гости не видят вкладки
+ document.getElementById('tabs').style.display='none';
  showGuestOrders();
 }
 
-function showGuestOrders(){
- const list=document.getElementById('orders-list');
- const guestOrders=pickupRequests.filter(r=>{
-   const g=guests.find(x=>x.id===r.guestId);
-   return g && g.fullName.toLowerCase().includes(currentGuestName.toLowerCase());
- });
- if(guestOrders.length===0){
-   list.innerHTML='<div class="empty">Нет заказов на ваше имя</div>';
-   return;
- }
- list.innerHTML=guestOrders.map(o=>{
-   const g=guests.find(x=>x.id===o.guestId);
-   const h=o.hotelId?hotels.find(x=>x.id===o.hotelId):null;
-   return `<div class="card"><h3>${g?.fullName}</h3>
-   ${h?`<p>🏨 ${h.name}</p>`:''}
-   <p>📅 ${new Date(o.pickupDateEpochMs).toLocaleString('ru-RU')}</p>
-   ${o.comment?`<p>💬 ${o.comment}</p>`:''}</div>`;
- }).join('');
-}
-
+// ---------- ОБНОВЛЕНИЕ КОНТЕНТА ----------
 function showTab(t){
  document.querySelectorAll('.content').forEach(e=>e.classList.remove('active'));
  document.getElementById(t).classList.add('active');
@@ -135,7 +179,6 @@ function showTab(t){
  event.target.classList.add('active');
  updateContent();
 }
-
 function updateContent(){updateQueue();updateDrivers();updateOrders();}
 function updateQueue(){
  const el=document.getElementById('queue-list');
@@ -161,8 +204,26 @@ function updateOrders(){
      return `<div class="card"><h3>${g?.fullName}</h3><p>${new Date(o.pickupDateEpochMs).toLocaleString('ru-RU')}</p>${o.comment?`<p>💬 ${o.comment}</p>`:''}</div>`;
    }).join('');
  }else if(role==='admin'){updateQueue();}
+ else{el.innerHTML='<div class="empty">Нет заказов</div>';}
+}
+function showGuestOrders(){
+ const list=document.getElementById('orders-list');
+ const guestOrders=pickupRequests.filter(r=>{
+   const g=guests.find(x=>x.id===r.guestId);
+   return g && g.fullName.toLowerCase().includes(currentGuestName.toLowerCase());
+ });
+ if(guestOrders.length===0){
+   list.innerHTML='<div class="empty">Нет заказов на ваше имя</div>';
+   return;
+ }
+ list.innerHTML=guestOrders.map(o=>{
+   const g=guests.find(x=>x.id===o.guestId);
+   const h=o.hotelId?hotels.find(x=>x.id===o.hotelId):null;
+   return `<div class="card"><h3>${g?.fullName}</h3>${h?`<p>🏨 ${h.name}</p>`:''}<p>📅 ${new Date(o.pickupDateEpochMs).toLocaleString('ru-RU')}</p>${o.comment?`<p>💬 ${o.comment}</p>`:''}</div>`;
+ }).join('');
 }
 
+// ---------- СОЗДАНИЕ ЗАКАЗА ----------
 function addGuest(){
  if(role!=='admin'){alert('Добавлять гостей может только администратор');return;}
  const name=document.getElementById('guestName').value.trim();
@@ -180,7 +241,9 @@ function addGuest(){
  alert('Заказ создан!');
  updateContent();
 }
+
 window.onload=()=>{loadData();}
 </script>
 </body>
 </html>
+
