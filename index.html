@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuestPickup - Управление встречами</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; color: #1d1d1f; margin-bottom: 8px; }
+        .header p { color: #666; font-size: 1.1rem; }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; overflow-x: auto; }
+        .tab { padding: 12px 16px; cursor: pointer; border: none; background: none; font-size: 14px; color: #666; border-bottom: 2px solid transparent; white-space: nowrap; }
+        .tab.active { color: #007aff; border-bottom-color: #007aff; }
+        .content { display: none; }
+        .content.active { display: block; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn { background: #007aff; color: white; border: none; border-radius: 8px; padding: 12px 24px; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        .btn:hover { background: #0056b3; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; }
+        .btn-success { background: #28a745; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+        .form-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .form-input:focus { outline: none; border-color: #007aff; box-shadow: 0 0 0 3px rgba(0,122,255,0.1); }
+        .list-item { padding: 16px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 12px; background: white; }
+        .empty-state { text-align: center; padding: 40px; color: #666; }
+        .empty-state h3 { margin: 16px 0 8px; color: #333; }
+        .alert { padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        @media (max-width: 768px) { .container { padding: 10px; } .header h1 { font-size: 2rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 GuestPickup</h1>
+            <p>Управление встречами гостей с водителями</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('queue')">📋 Очередь</button>
+            <button class="tab" onclick="showTab('drivers')">🚗 Водители</button>
+            <button class="tab" onclick="showTab('orders')">📦 Мои заказы</button>
+            <button class="tab" onclick="showTab('add')">➕ Добавить</button>
+        </div>
+
+        <div id="queue" class="content active">
+            <div class="card">
+                <h2>📋 Очередь заявок</h2>
+                <div id="queue-list">
+                    <div class="empty-state">
+                        <div style="font-size: 64px; margin-bottom: 16px;">⏳</div>
+                        <h3>Очередь пуста</h3>
+                        <p>Все запросы обработаны</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="drivers" class="content">
+            <div class="card">
+                <h2>🚗 Водители</h2>
+                <div id="drivers-list">
+                    <div class="empty-state">
+                        <div style="font-size: 64px; margin-bottom: 16px;">🚗</div>
+                        <h3>Нет водителей</h3>
+                        <p>Добавьте первого водителя</p>
+                    </div>
+                </div>
+                <button class="btn" onclick="showAddDriverForm()">➕ Добавить водителя</button>
+                
+                <div id="add-driver-form" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3>Новый водитель</h3>
+                    <div class="form-group">
+                        <label class="form-label">Имя</label>
+                        <input type="text" id="driver-name" class="form-input" placeholder="Введите имя водителя">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Телефон</label>
+                        <input type="tel" id="driver-phone" class="form-input" placeholder="+7 (999) 123-45-67">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Номер машины</label>
+                        <input type="text" id="driver-car" class="form-input" placeholder="А123БВ77">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn" onclick="addDriver()">Сохранить</button>
+                        <button class="btn btn-secondary" onclick="hideAddDriverForm()">Отмена</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="orders" class="content">
+            <div class="card">
+                <h2>📦 Мои заказы</h2>
+                <div id="orders-list">
+                    <div class="empty-state">
+                        <div style="font-size: 64px; margin-bottom: 16px;">👤</div>
+                        <h3>Выберите водителя</h3>
+                        <p>Перейдите на вкладку "Водители" и выберите себя</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="add" class="content">
+            <div class="card">
+                <h2>➕ Добавить гостя</h2>
+                <div id="add-alerts"></div>
+                
+                <div class="form-group">
+                    <label class="form-label">ФИО гостя *</label>
+                    <input type="text" id="guest-name" class="form-input" placeholder="Иванов Иван Иванович">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Кто встречает (опционально)</label>
+                    <input type="text" id="control-person" class="form-input" placeholder="Петрова Мария Ивановна">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Название отеля (опционально)</label>
+                    <input type="text" id="hotel-name" class="form-input" placeholder="Отель Москва">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">📅 Дата и время встречи</label>
+                    <input type="datetime-local" id="pickup-date" class="form-input">
+                </div>
+                
+                <button class="btn" onclick="addGuest()" style="width: 100%;">➕ Создать запрос</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let drivers = [], guests = [], hotels = [], pickupRequests = [], currentDriverId = null;
+
+        function loadData() {
+            drivers = JSON.parse(localStorage.getItem('drivers') || '[]');
+            guests = JSON.parse(localStorage.getItem('guests') || '[]');
+            hotels = JSON.parse(localStorage.getItem('hotels') || '[]');
+            pickupRequests = JSON.parse(localStorage.getItem('pickupRequests') || '[]');
+            currentDriverId = localStorage.getItem('currentDriverId');
+            
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('pickup-date').value = now.toISOString().slice(0, 16);
+        }
+
+        function saveData() {
+            localStorage.setItem('drivers', JSON.stringify(drivers));
+            localStorage.setItem('guests', JSON.stringify(guests));
+            localStorage.setItem('hotels', JSON.stringify(hotels));
+            localStorage.setItem('pickupRequests', JSON.stringify(pickupRequests));
+            if (currentDriverId) localStorage.setItem('currentDriverId', currentDriverId);
+        }
+
+        function generateId() { return Date.now().toString() + Math.random().toString(36).substr(2, 9); }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            updateContent();
+        }
+
+        function updateContent() {
+            updateQueue(); updateDrivers(); updateOrders();
+        }
+
+        function updateQueue() {
+            const queueList = document.getElementById('queue-list');
+            const queue = pickupRequests.filter(req => !req.assignedDriverId);
+            
+            if (queue.length === 0) {
+                queueList.innerHTML = '<div class="empty-state"><div style="font-size: 64px; margin-bottom: 16px;">⏳</div><h3>Очередь пуста</h3><p>Все запросы обработаны</p></div>';
+                return;
+            }
+            
+            queueList.innerHTML = queue.map(request => {
+                const guest = guests.find(g => g.id === request.guestId);
+                const hotel = request.hotelId ? hotels.find(h => h.id === request.hotelId) : null;
+                const pickupDate = new Date(request.pickupDateEpochMs).toLocaleString('ru-RU');
+                
+                return `<div class="list-item">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <h4>${guest?.fullName || 'Неизвестный гость'}</h4>
+                            ${guest?.controlPerson ? `<p style="color: #666; margin: 4px 0;">Встречает: ${guest.controlPerson}</p>` : ''}
+                            ${hotel ? `<p style="color: #666; margin: 4px 0;">Отель: ${hotel.name}</p>` : ''}
+                            <p style="color: #007aff; font-size: 14px; margin-top: 8px;">📅 Встреча: ${pickupDate}</p>
+                        </div>
+                        <div style="margin-left: 20px;">
+                            <button class="btn btn-success" onclick="takeRequest('${request.id}')">✋ Взять заказ</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateDrivers() {
+            const driversList = document.getElementById('drivers-list');
+            
+            if (drivers.length === 0) {
+                driversList.innerHTML = '<div class="empty-state"><div style="font-size: 64px; margin-bottom: 16px;">🚗</div><h3>Нет водителей</h3><p>Добавьте первого водителя</p></div>';
+                return;
+            }
+            
+            driversList.innerHTML = drivers.map(driver => {
+                const isSelected = currentDriverId === driver.id;
+                return `<div class="list-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4>${driver.name}</h4>
+                            <p style="color: #666; margin: 4px 0;">${driver.phone}</p>
+                            <p style="color: #666; font-size: 14px;">Машина: ${driver.carNumber}</p>
+                        </div>
+                        <div>
+                            ${isSelected ? '<span style="color: #28a745; font-size: 24px;">✅</span>' : ''}
+                            <button class="btn ${isSelected ? 'btn-success' : 'btn-secondary'}" onclick="selectDriver('${driver.id}')" style="margin-left: 10px;">
+                                ${isSelected ? 'Выбран' : 'Выбрать'}
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateOrders() {
+            const ordersList = document.getElementById('orders-list');
+            
+            if (!currentDriverId) {
+                ordersList.innerHTML = '<div class="empty-state"><div style="font-size: 64px; margin-bottom: 16px;">👤</div><h3>Выберите водителя</h3><p>Перейдите на вкладку "Водители" и выберите себя</p></div>';
+                return;
+            }
+            
+            const currentDriver = drivers.find(d => d.id === currentDriverId);
+            const myOrders = pickupRequests.filter(req => req.assignedDriverId === currentDriverId);
+            
+            if (myOrders.length === 0) {
+                ordersList.innerHTML = `<div class="empty-state">
+                    <div style="font-size: 64px; margin-bottom: 16px;">📦</div>
+                    <h3>Нет активных заказов</h3>
+                    <p>У вас пока нет назначенных заказов</p>
+                    ${currentDriver ? `<p style="color: #666; font-size: 14px; margin-top: 10px;">Водитель: <strong>${currentDriver.name}</strong></p>` : ''}
+                </div>`;
+                return;
+            }
+            
+            ordersList.innerHTML = `
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 20px;">👤</span>
+                        <div>
+                            <strong>${currentDriver.name}</strong>
+                            <div style="font-size: 14px; color: #666;">${currentDriver.phone} • ${currentDriver.carNumber}</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 16px; color: #666; font-size: 14px;">Всего активных заказов: <strong>${myOrders.length}</strong></div>
+                ${myOrders.map(order => {
+                    const guest = guests.find(g => g.id === order.guestId);
+                    const hotel = order.hotelId ? hotels.find(h => h.id === order.hotelId) : null;
+                    const pickupDate = new Date(order.pickupDateEpochMs).toLocaleString('ru-RU');
+                    const createdDate = new Date(order.createdAtEpochMs).toLocaleString('ru-RU');
+                    
+                    const now = Date.now();
+                    const timeDiff = order.pickupDateEpochMs - now;
+                    const hoursDiff = timeDiff / (1000 * 60 * 60);
+                    
+                    let statusColor = '#28a745', statusText = 'Запланировано';
+                    if (hoursDiff < 0) { statusColor = '#dc3545'; statusText = 'Просрочено'; }
+                    else if (hoursDiff < 1) { statusColor = '#fd7e14'; statusText = 'Срочно'; }
+                    else if (hoursDiff < 24) { statusColor = '#ffc107'; statusText = 'Скоро'; }
+                    
+                    return `<div class="list-item" style="position: relative;">
+                        <div style="position: absolute; top: 12px; right: 12px; background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">${statusText}</div>
+                        <div style="padding-right: 100px;">
+                            <h4 style="margin-bottom: 8px;">${guest?.fullName || 'Неизвестный гость'}</h4>
+                            ${guest?.controlPerson ? `<p style="color: #666; margin: 4px 0;">👤 Встречает: ${guest.controlPerson}</p>` : ''}
+                            ${hotel ? `<p style="color: #666; margin: 4px 0;">📍 ${hotel.name}</p>` : ''}
+                            <p style="color: #007aff; margin: 4px 0;">📅 Встреча: ${pickupDate}</p>
+                            <p style="color: #666; font-size: 14px; margin: 4px 0;">⏰ Создан: ${createdDate}</p>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <button class="btn btn-success" onclick="completeOrder('${order.id}')">✅ Завершить заказ</button>
+                        </div>
+                    </div>`;
+                }).join('')}
+            `;
+        }
+
+        function showAddDriverForm() { document.getElementById('add-driver-form').style.display = 'block'; }
+        function hideAddDriverForm() { 
+            document.getElementById('add-driver-form').style.display = 'none';
+            document.getElementById('driver-name').value = '';
+            document.getElementById('driver-phone').value = '';
+            document.getElementById('driver-car').value = '';
+        }
+
+        function addDriver() {
+            const name = document.getElementById('driver-name').value.trim();
+            const phone = document.getElementById('driver-phone').value.trim();
+            const carNumber = document.getElementById('driver-car').value.trim();
+            
+            if (!name || !phone || !carNumber) {
+                alert('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            const driver = { id: generateId(), name, phone, carNumber };
+            drivers.push(driver);
+            saveData();
+            updateDrivers();
+            hideAddDriverForm();
+        }
+
+        function selectDriver(driverId) {
+            currentDriverId = driverId;
+            saveData();
+            updateDrivers();
+            updateOrders();
+        }
+
+        function takeRequest(requestId) {
+            if (!currentDriverId) {
+                alert('Сначала выберите водителя на вкладке "Водители"');
+                return;
+            }
+            
+            const request = pickupRequests.find(req => req.id === requestId);
+            if (request) {
+                request.assignedDriverId = currentDriverId;
+                saveData();
+                updateQueue();
+                updateOrders();
+                alert('Заказ успешно взят! Перейдите на вкладку "Мои заказы" для просмотра.');
+            }
+        }
+
+        function completeOrder(orderId) {
+            if (confirm('Вы уверены, что хотите завершить этот заказ?')) {
+                const index = pickupRequests.findIndex(req => req.id === orderId);
+                if (index !== -1) {
+                    pickupRequests.splice(index, 1);
+                    saveData();
+                    updateOrders();
+                }
+            }
+        }
+
+        function addGuest() {
+            const guestName = document.getElementById('guest-name').value.trim();
+            const controlPerson = document.getElementById('control-person').value.trim();
+            const hotelName = document.getElementById('hotel-name').value.trim();
+            const pickupDate = document.getElementById('pickup-date').value;
+            
+            if (!guestName) {
+                showAlert('Пожалуйста, введите ФИО гостя', 'error');
+                return;
+            }
+            
+            const guest = { id: generateId(), fullName: guestName, controlPerson };
+            guests.push(guest);
+            
+            let hotel = null;
+            if (hotelName) {
+                hotel = { id: generateId(), name: hotelName, address: '' };
+                hotels.push(hotel);
+            }
+            
+            const request = {
+                id: generateId(),
+                guestId: guest.id,
+                hotelId: hotel?.id,
+                createdAtEpochMs: Date.now(),
+                assignedDriverId: null,
+                pickupDateEpochMs: new Date(pickupDate).getTime()
+            };
+            pickupRequests.push(request);
+            
+            saveData();
+            updateQueue();
+            
+            document.getElementById('guest-name').value = '';
+            document.getElementById('control-person').value = '';
+            document.getElementById('hotel-name').value = '';
+            
+            showAlert('Запрос на встречу гостя успешно создан!', 'success');
+        }
+
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('add-alerts');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            
+            alertsContainer.innerHTML = `<div class="alert ${alertClass}">
+                <strong>${type === 'success' ? 'Успех!' : 'Ошибка!'}</strong> ${message}
+                <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; cursor: pointer;">✕</button>
+            </div>`;
+            
+            setTimeout(() => { alertsContainer.innerHTML = ''; }, 5000);
+        }
+
+        window.onload = function() { loadData(); updateContent(); };
+    </script>
+</body>
+</html>
